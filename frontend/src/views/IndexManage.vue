@@ -55,7 +55,7 @@
         </el-table-column>
       </el-table>
       <div class="pagination">
-        <el-pagination v-model:current-page="page" :page-size="pageSize"
+        <el-pagination v-model:current-page="page" v-model:page-size="pageSize"
                        :total="total" :page-sizes="[10,20,50,100]"
                        layout="total,sizes,prev,pager,next"
                        @current-change="onPageChange"
@@ -152,7 +152,8 @@ function handleSearch(conditions) {
   doSearch(conditions)
 }
 
-function onPageChange() {
+function onPageChange(newPage) {
+  // newPage is the updated page number (current-change) or new size (size-change)
   syncPaginationInDsl()
   doSearch()
 }
