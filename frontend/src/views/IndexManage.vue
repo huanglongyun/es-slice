@@ -88,7 +88,7 @@ const selectedIndex = ref('')
 const indexFields = ref([])
 
 const fieldSearchRef = ref(null)
-const dslVisible = ref(false)
+const dslVisible = ref(true)
 const dslText = ref('')
 
 const tableData = ref([])
@@ -101,6 +101,26 @@ const total = ref(0)
 const detailDialogRef = ref(null)
 const editDialogRef = ref(null)
 const importDialogVisible = ref(false)
+
+// 默认 DSL 模板
+function buildDefaultDsl(conds) {
+  const query = conds && conds.length
+    ? { bool: { must: conds.map(c => ({ [c.matchType]: { [c.field]: c.value } })) } }
+    : { query_string: { query: '*' } }
+  return {
+    query,
+    size: pageSize.value,
+    from: (page.value - 1) * pageSize.value,
+    sort: []
+  }
+}
+
+function stringifyDsl(conds) {
+  return JSON.stringify(buildDefaultDsl(conds), null, 2)
+}
+
+// 初始化默认 DSL
+dslText.value = stringifyDsl()
 
 getIndexes().then(res => { indexes.value = res.data }).catch(() => {})
 
@@ -119,19 +139,32 @@ async function onIndexChange(val) {
 }
 
 function handleReset() {
-  dslText.value = ''
   page.value = 1
+  pageSize.value = 20
   tableData.value = []
   total.value = 0
+  dslText.value = stringifyDsl()
 }
 
 function handleSearch(conditions) {
   page.value = 1
+  syncPaginationInDsl()
   doSearch(conditions)
 }
 
 function onPageChange() {
+  syncPaginationInDsl()
   doSearch()
+}
+
+function syncPaginationInDsl() {
+  // 更新 DSL 中的 from/size，保持用户的 query 不变
+  try {
+    const dsl = JSON.parse(dslText.value)
+    dsl.size = pageSize.value
+    dsl.from = (page.value - 1) * pageSize.value
+    dslText.value = JSON.stringify(dsl, null, 2)
+  } catch (e) { /* 保持原样 */ }
 }
 
 async function doSearch(conditions) {
@@ -140,8 +173,11 @@ async function doSearch(conditions) {
   try {
     const conds = conditions || fieldSearchRef.value?.getConditions() || []
     let dsl = null
-    if (dslText.value) {
-      try { dsl = JSON.parse(dslText.value) } catch (e) { /* ignore */ }
+    try { dsl = JSON.parse(dslText.value) } catch (e) { /* ignore */ }
+    // 始终用当前分页覆盖
+    if (dsl) {
+      dsl.size = pageSize.value
+      dsl.from = (page.value - 1) * pageSize.value
     }
     const res = await searchDocs(selectedIndex.value, {
       conditions: conds,
@@ -158,12 +194,7 @@ async function doSearch(conditions) {
 
 function syncDsl() {
   const conds = fieldSearchRef.value?.getConditions() || []
-  if (conds.length) {
-    const must = conds.map(c => ({ [c.matchType]: { [c.field]: c.value } }))
-    dslText.value = JSON.stringify({ query: { bool: { must } } }, null, 2)
-  } else {
-    dslText.value = JSON.stringify({ query: { match_all: {} } }, null, 2)
-  }
+  dslText.value = stringifyDsl(conds)
 }
 
 function showDetail(row) {
