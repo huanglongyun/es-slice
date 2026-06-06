@@ -34,10 +34,14 @@ const emit = defineEmits(['update:modelValue', 'search', 'reset'])
 
 const conditions = ref([{ field: '', matchType: 'match', value: '' }])
 
+// 从父组件同步值（仅初始化）
 watch(() => props.modelValue, (val) => {
-  if (val.length) conditions.value = JSON.parse(JSON.stringify(val))
+  if (val && val.length > 0 && JSON.stringify(val) !== JSON.stringify(conditions.value)) {
+    conditions.value = JSON.parse(JSON.stringify(val))
+  }
 }, { immediate: true })
 
+// 向父组件同步值
 watch(conditions, (val) => {
   emit('update:modelValue', JSON.parse(JSON.stringify(val)))
 }, { deep: true })
@@ -47,7 +51,9 @@ function addRow() {
 }
 
 function removeRow(idx) {
-  conditions.value.splice(idx, 1)
+  if (conditions.value.length > 1) {
+    conditions.value.splice(idx, 1)
+  }
 }
 
 defineExpose({ conditions })
