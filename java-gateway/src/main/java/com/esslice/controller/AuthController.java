@@ -24,7 +24,7 @@ public class AuthController {
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
 
-    @PostMapping("/login")
+    @PostMapping("/login.do")
     public ResponseEntity<?> login(@RequestBody LoginRequest req) {
         Optional<SysUser> opt = userService.findByUsername(req.getUsername());
         if (!opt.isPresent() || opt.get().getStatus() == 0) {
@@ -51,12 +51,12 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("code", 0, "data", resp));
     }
 
-    @PostMapping("/logout")
+    @PostMapping("/logout.do")
     public ResponseEntity<?> logout() {
         return ResponseEntity.ok(Map.of("code", 0, "message", "ok"));
     }
 
-    @GetMapping("/userinfo")
+    @GetMapping("/userinfo.do")
     public ResponseEntity<?> userinfo() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null) {

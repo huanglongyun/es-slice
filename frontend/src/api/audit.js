@@ -1,5 +1,5 @@
 import request from '@/utils/request'
 
 export function getAuditLogs(params) {
-  return request.get('/audit-logs', { params })
+  return request.get('/audit-logs/list.do', { params })
 }

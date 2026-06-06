@@ -18,7 +18,7 @@ public class AuditController {
     @Autowired
     private AuditService auditService;
 
-    @GetMapping
+    @GetMapping("/list.do")
     public ResponseEntity<?> query(
             @RequestParam(required = false) String username,
             @RequestParam(required = false) String indexName,
