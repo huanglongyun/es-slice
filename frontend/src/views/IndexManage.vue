@@ -7,13 +7,13 @@
       </el-select>
     </div>
 
-    <div class="section" v-if="selectedIndex">
+    <div class="section">
       <h4>字段搜索</h4>
       <FieldSearch ref="fieldSearchRef" :fields="indexFields"
                    @search="handleSearch" @reset="handleReset" />
     </div>
 
-    <div class="section" v-if="selectedIndex && dslVisible">
+    <div class="section" v-if="dslVisible">
       <h4>
         自定义 DSL
         <el-button text size="small" @click="dslVisible = false">收起</el-button>
@@ -21,20 +21,20 @@
       <el-input v-model="dslText" type="textarea" :rows="6"
                 placeholder='{"query":{"bool":{"must":[...]}}}' />
     </div>
-    <div class="section" v-else-if="selectedIndex">
+    <div class="section" v-else>
       <el-button text size="small" @click="dslVisible = true; syncDsl()">
         展开自定义 DSL
       </el-button>
     </div>
 
-    <div class="section" v-if="selectedIndex">
+    <div class="section">
       <el-button @click="handleExport" icon="Download"
-                 :disabled="role === 'viewer'">导出 JSONL</el-button>
+                 :disabled="role === 'viewer' || !selectedIndex">导出 JSONL</el-button>
       <el-button @click="importDialogVisible = true" icon="Upload"
                  :disabled="role === 'viewer'">导入 Excel</el-button>
     </div>
 
-    <div class="section" v-if="selectedIndex">
+    <div class="section">
       <el-table :data="tableData" border stripe v-loading="tableLoading" style="width:100%">
         <el-table-column type="index" label="序号" width="60" />
         <el-table-column v-for="col in tableColumns" :key="col"
@@ -135,6 +135,7 @@ function onPageChange() {
 }
 
 async function doSearch(conditions) {
+  if (!selectedIndex.value) return
   tableLoading.value = true
   try {
     const conds = conditions || fieldSearchRef.value?.getConditions() || []

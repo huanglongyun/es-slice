@@ -50,6 +50,7 @@ async function handleLogout() {
 
 <style scoped>
 .app-layout { height: 100vh; }
+.el-aside { overflow: hidden; }
 .app-header {
   display: flex;
   align-items: center;
