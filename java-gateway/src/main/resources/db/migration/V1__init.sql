@@ -26,6 +26,7 @@ CREATE TABLE audit_log (
     created_at DATETIME
 );
 
--- 默认管理员: admin / admin123
-INSERT INTO sys_user (username, password, real_name, role, status, created_at, updated_at)
-VALUES ('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt6Z5Eh', '系统管理员', 'admin', 1, NOW(), NOW());
+--
+-- 默认管理员由 DataInitializer.java 在启动时自动创建
+-- 用户名: admin, 密码: admin123
+--
