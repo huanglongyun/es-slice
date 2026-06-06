@@ -54,7 +54,11 @@ function handleReset() {
   emit('reset')
 }
 
-defineExpose({ getConditions, reset: handleReset })
+function resetFromParent() {
+  conditions.value = [{ field: '', matchType: 'match', value: '' }]
+}
+
+defineExpose({ getConditions, reset: resetFromParent })
 </script>
 
 <style scoped>

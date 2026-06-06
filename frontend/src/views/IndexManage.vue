@@ -114,11 +114,11 @@ async function onIndexChange(val) {
   } finally {
     tableLoading.value = false
   }
+  fieldSearchRef.value?.reset()
   handleReset()
 }
 
 function handleReset() {
-  if (fieldSearchRef.value) fieldSearchRef.value.reset()
   dslText.value = ''
   page.value = 1
   tableData.value = []
