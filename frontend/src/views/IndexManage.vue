@@ -10,7 +10,6 @@
     <div class="section" v-if="selectedIndex">
       <h4>字段搜索</h4>
       <FieldSearch ref="fieldSearchRef" :fields="indexFields"
-                   v-model="searchConditions"
                    @search="handleSearch" @reset="handleReset" />
     </div>
 
@@ -59,15 +58,15 @@
         <el-pagination v-model:current-page="page" :page-size="pageSize"
                        :total="total" :page-sizes="[10,20,50,100]"
                        layout="total,sizes,prev,pager,next"
-                       @current-change="handleSearch"
-                       @size-change="handleSearch" />
+                       @current-change="doSearch"
+                       @size-change="doSearch" />
       </div>
     </div>
 
     <DocDetailDialog ref="detailDialogRef" />
-    <DocEditDialog ref="editDialogRef" @saved="handleSearch" />
+    <DocEditDialog ref="editDialogRef" @saved="doSearch" />
     <ImportDialog v-model:visible="importDialogVisible" :indexes="indexes"
-                  @imported="handleSearch" />
+                  @imported="doSearch" />
   </div>
 </template>
 
@@ -89,7 +88,6 @@ const selectedIndex = ref('')
 const indexFields = ref([])
 
 const fieldSearchRef = ref(null)
-const searchConditions = ref([])
 const dslVisible = ref(false)
 const dslText = ref('')
 
@@ -108,40 +106,53 @@ getIndexes().then(res => { indexes.value = res.data }).catch(() => {})
 
 async function onIndexChange(val) {
   if (!val) return
-  const res = await getIndexFields(val)
-  indexFields.value = res.data
-  tableColumns.value = res.data.map(f => f.name)
+  tableLoading.value = true
+  try {
+    const res = await getIndexFields(val)
+    indexFields.value = res.data
+    tableColumns.value = res.data.map(f => f.name)
+  } finally {
+    tableLoading.value = false
+  }
   handleReset()
 }
 
 function handleReset() {
-  searchConditions.value = [{ field: '', matchType: 'match', value: '' }]
+  if (fieldSearchRef.value) fieldSearchRef.value.reset()
   dslText.value = ''
   page.value = 1
+  tableData.value = []
+  total.value = 0
 }
 
-async function handleSearch() {
+function handleSearch(conditions) {
+  page.value = 1
+  doSearch(conditions)
+}
+
+async function doSearch(conditions) {
   tableLoading.value = true
   try {
+    const conds = conditions || fieldSearchRef.value?.getConditions() || []
     let dsl = null
     if (dslText.value) {
       try { dsl = JSON.parse(dslText.value) } catch (e) { /* ignore */ }
     }
     const res = await searchDocs(selectedIndex.value, {
-      conditions: searchConditions.value.filter(c => c.field && c.value),
+      conditions: conds,
       dsl,
       page: page.value,
       pageSize: pageSize.value
     })
-    tableData.value = res.data.list
-    total.value = res.data.total
+    tableData.value = res.data.list || []
+    total.value = res.data.total || 0
   } finally {
     tableLoading.value = false
   }
 }
 
 function syncDsl() {
-  const conds = searchConditions.value.filter(c => c.field && c.value)
+  const conds = fieldSearchRef.value?.getConditions() || []
   if (conds.length) {
     const must = conds.map(c => ({ [c.matchType]: { [c.field]: c.value } }))
     dslText.value = JSON.stringify({ query: { bool: { must } } }, null, 2)
@@ -161,7 +172,7 @@ function showEdit(row) {
 async function handleDelete(row) {
   await deleteDoc(selectedIndex.value, row._id)
   ElMessage.success('删除成功')
-  handleSearch()
+  doSearch()
 }
 
 async function handleExport() {
@@ -169,8 +180,9 @@ async function handleExport() {
   if (dslText.value) {
     try { dsl = JSON.parse(dslText.value) } catch (e) {}
   }
+  const conds = fieldSearchRef.value?.getConditions() || []
   const res = await exportDocs(selectedIndex.value, {
-    conditions: searchConditions.value.filter(c => c.field && c.value),
+    conditions: conds,
     dsl
   })
   const blob = new Blob([res], { type: 'application/octet-stream' })

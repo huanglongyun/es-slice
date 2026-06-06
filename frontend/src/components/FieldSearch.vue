@@ -16,47 +16,45 @@
                  icon="Plus" circle size="small" type="primary" />
     </div>
     <div class="search-actions">
-      <el-button type="primary" @click="$emit('search')" icon="Search">搜索</el-button>
-      <el-button @click="$emit('reset')" icon="Refresh">重置</el-button>
+      <el-button type="primary" @click="handleSearch" icon="Search">搜索</el-button>
+      <el-button @click="handleReset" icon="Refresh">重置</el-button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 
 const props = defineProps({
-  fields: { type: Array, default: () => [] },
-  modelValue: { type: Array, default: () => [] }
+  fields: { type: Array, default: () => [] }
 })
 
-const emit = defineEmits(['update:modelValue', 'search', 'reset'])
+const emit = defineEmits(['search', 'reset'])
 
 const conditions = ref([{ field: '', matchType: 'match', value: '' }])
-
-// 从父组件同步值（仅初始化）
-watch(() => props.modelValue, (val) => {
-  if (val && val.length > 0 && JSON.stringify(val) !== JSON.stringify(conditions.value)) {
-    conditions.value = JSON.parse(JSON.stringify(val))
-  }
-}, { immediate: true })
-
-// 向父组件同步值
-watch(conditions, (val) => {
-  emit('update:modelValue', JSON.parse(JSON.stringify(val)))
-}, { deep: true })
 
 function addRow() {
   conditions.value.push({ field: '', matchType: 'match', value: '' })
 }
 
 function removeRow(idx) {
-  if (conditions.value.length > 1) {
-    conditions.value.splice(idx, 1)
-  }
+  conditions.value.splice(idx, 1)
 }
 
-defineExpose({ conditions })
+function getConditions() {
+  return conditions.value.filter(c => c.field && c.value)
+}
+
+function handleSearch() {
+  emit('search', getConditions())
+}
+
+function handleReset() {
+  conditions.value = [{ field: '', matchType: 'match', value: '' }]
+  emit('reset')
+}
+
+defineExpose({ getConditions, reset: handleReset })
 </script>
 
 <style scoped>
