@@ -10,7 +10,7 @@
     <div class="section">
       <h4>字段搜索</h4>
       <FieldSearch ref="fieldSearchRef" :fields="indexFields"
-                   @search="handleSearch" @reset="handleReset" />
+                   @search="handleSearch" @reset="handleReset" @change="syncDsl" />
     </div>
 
     <div class="section" v-if="dslVisible">

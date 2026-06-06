@@ -23,15 +23,20 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
 const props = defineProps({
   fields: { type: Array, default: () => [] }
 })
 
-const emit = defineEmits(['search', 'reset'])
+const emit = defineEmits(['search', 'reset', 'change'])
 
 const conditions = ref([{ field: '', matchType: 'match', value: '' }])
+
+// 条件变化时通知父组件同步 DSL
+watch(conditions, () => {
+  emit('change', getConditions())
+}, { deep: true })
 
 function addRow() {
   conditions.value.push({ field: '', matchType: 'match', value: '' })
