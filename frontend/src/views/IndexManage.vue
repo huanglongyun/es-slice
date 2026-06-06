@@ -58,8 +58,8 @@
         <el-pagination v-model:current-page="page" :page-size="pageSize"
                        :total="total" :page-sizes="[10,20,50,100]"
                        layout="total,sizes,prev,pager,next"
-                       @current-change="doSearch"
-                       @size-change="doSearch" />
+                       @current-change="onPageChange"
+                       @size-change="onPageChange" />
       </div>
     </div>
 
@@ -128,6 +128,10 @@ function handleReset() {
 function handleSearch(conditions) {
   page.value = 1
   doSearch(conditions)
+}
+
+function onPageChange() {
+  doSearch()
 }
 
 async function doSearch(conditions) {
