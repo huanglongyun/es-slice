@@ -4,11 +4,13 @@ from config import SERVICE_PORT
 from api.indexes import router as indexes_router
 from api.search import router as search_router
 from api.documents import router as documents_router
+from api.transport import router as transport_router
 
 app = FastAPI(title="ES Slice Service", version="1.0.0")
 app.include_router(indexes_router)
 app.include_router(search_router)
 app.include_router(documents_router)
+app.include_router(transport_router)
 
 @app.get("/health")
 def health():
