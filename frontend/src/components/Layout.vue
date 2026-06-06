@@ -48,18 +48,22 @@ async function handleLogout() {
 }
 </script>
 
-<style scoped>
-.app-layout { height: 100vh; }
-.el-aside { overflow: hidden; }
-.app-header {
+<style>
+html, body, #app { height: 100%; margin: 0; padding: 0; }
+.app-layout { height: 100%; }
+.app-layout > .el-container { height: 100%; }
+.el-aside { height: 100%; overflow: hidden; background-color: #304156; }
+.el-header.app-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   background: #fff;
   border-bottom: 1px solid #e4e7ed;
   padding: 0 20px;
+  height: 60px;
 }
 .app-header .title { font-size: 16px; font-weight: bold; }
 .header-right { display: flex; align-items: center; gap: 12px; }
 .username { color: #606266; }
+.el-main { overflow: auto; }
 </style>
