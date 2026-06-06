@@ -23,6 +23,7 @@ public class EsGatewayController {
     public ResponseEntity<?> proxy(HttpServletRequest request, @RequestBody(required = false) String body) {
         try {
             String path = request.getRequestURI();
+            path = path.replaceFirst("/api", "");  // 去掉 /api 前缀，Python 路由不带
             String query = request.getQueryString();
             String targetUrl = pythonBaseUrl + path;
             if (query != null) {
