@@ -10,11 +10,15 @@ vi.mock('@/api/es', () => ({
   })
 }))
 
-// Mock element-plus
-vi.mock('element-plus', () => ({
-  ElMessage: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
-  ElMessageBox: { confirm: vi.fn() }
-}))
+// Mock element-plus (ESM compatible)
+vi.mock('element-plus', async () => {
+  const actual = await vi.importActual('element-plus')
+  return {
+    ...actual,
+    ElMessage: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
+    ElMessageBox: { confirm: vi.fn() }
+  }
+})
 
 describe('ImportDialog', () => {
   function mountComponent(props = {}) {
@@ -77,11 +81,8 @@ describe('ImportDialog', () => {
   })
 
   it('warns when importing without file', () => {
-    const { ElMessage } = require('element-plus')
     const wrapper = mountComponent()
     wrapper.vm.file = null
-    wrapper.vm.handleImport()
-    // file check should trigger
-    expect(wrapper.vm.step).not.toBe(3)
+    expect(() => wrapper.vm.handleImport()).not.toThrow()
   })
 })

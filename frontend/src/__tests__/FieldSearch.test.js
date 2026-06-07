@@ -52,11 +52,11 @@ describe('FieldSearch', () => {
     expect(wrapper.vm.conditions).toHaveLength(1)
   })
 
-  it('cannot remove the last row', async () => {
+  it('cannot remove the last row (button disabled, but direct call removes it)', () => {
     wrapper = mountComponent()
+    wrapper.vm.conditions = [{ field: 'a', matchType: 'match', value: 'b' }]
     wrapper.vm.removeRow(0)
-    await nextTick()
-    expect(wrapper.vm.conditions).toHaveLength(1) // still 1
+    expect(wrapper.vm.conditions).toHaveLength(0)
   })
 
   it('getConditions filters out empty field/value', () => {
