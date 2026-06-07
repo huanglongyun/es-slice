@@ -21,7 +21,7 @@ def export_docs(index: str, body: dict):
         filename = f"{index}_export.jsonl"
         return StreamingResponse(
             buffer,
-            media_type="application/octet-stream",
+            media_type="text/plain; charset=utf-8",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'}
         )
     except Exception as e:

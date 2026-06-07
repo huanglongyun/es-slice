@@ -6,6 +6,7 @@ def export_jsonl(index: str, dsl: dict) -> io.BytesIO:
     """执行 scroll 搜索并返回 JSONL 格式的字节流"""
     docs = scroll_search(index, dsl)
     buffer = io.BytesIO()
+    buffer.write(b'\xef\xbb\xbf')  # UTF-8 BOM for Windows compatibility
     for doc in docs:
         line = json.dumps(doc, ensure_ascii=False) + "\n"
         buffer.write(line.encode("utf-8"))
