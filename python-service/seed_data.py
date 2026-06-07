@@ -61,7 +61,7 @@ feedback_mapping = {
             "device": {"type": "keyword"},
             "tags": {"type": "keyword"},
             "submit_date": {"type": "date", "format": "yyyy-MM-dd"},
-            "resolved": {"type": "boolean"}
+            "resolved": {"type": "keyword"}
         }
     }
 }
@@ -175,7 +175,7 @@ def gen_feedback_docs(n=100):
                 "device": random.choice(devices),
                 "tags": random.sample(feedback_tags, k=random.randint(1, 3)),
                 "submit_date": f"202{random.randint(4,6)}-{random.randint(1,12):02d}-{random.randint(1,28):02d}",
-                "resolved": random.choice([True, False]),
+                "resolved": random.choice(["是", "否"]),
             }
         })
     return docs
