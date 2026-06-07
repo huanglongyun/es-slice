@@ -72,7 +72,8 @@ def delete_doc(index: str, doc_id: str) -> None:
 def scroll_search(index: str, dsl: dict, batch_size: int = 500) -> list[dict]:
     """使用 scroll API 遍历大批量结果，用于导出"""
     es = get_es_client()
-    result = es.search(index=index, body=dsl, scroll="2m", size=batch_size)
+    scroll_dsl = {k: v for k, v in dsl.items() if k != "from"}  # scroll 不支持 from
+    result = es.search(index=index, body=scroll_dsl, scroll="2m", size=batch_size)
     scroll_id = result["_scroll_id"]
     hits = [h["_source"] | {"_id": h["_id"]} for h in result["hits"]["hits"]]
     while True:
