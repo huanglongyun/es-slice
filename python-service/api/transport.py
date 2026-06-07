@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from services.es_client import bulk_update
 from services.export_service import export_jsonl
 from services.import_service import parse_excel_to_docs
