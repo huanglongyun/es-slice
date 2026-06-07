@@ -98,7 +98,8 @@ async function handlePreview() {
   previewing.value = true
   try {
     const formData = new FormData()
-    formData.append('file', file.value)
+    formData.append('file', file.value, file.value.name)
+    formData.append('indexes', selectedIndexes.value.join(','))
     formData.append('preview', 'true')
     const res = await importExcel(formData)
     previewData.value = res.data.rows || []
