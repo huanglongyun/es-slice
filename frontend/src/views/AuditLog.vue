@@ -37,6 +37,11 @@
         <el-table-column prop="docId" label="文档ID" width="120" show-overflow-tooltip />
         <el-table-column prop="ipAddress" label="IP" width="130" />
         <el-table-column prop="createdAt" label="时间" width="170" />
+        <el-table-column label="操作" width="80" fixed="right">
+          <template #default="{ row }">
+            <el-button text type="primary" size="small" @click="showDetail(row)">详情</el-button>
+          </template>
+        </el-table-column>
       </el-table>
 
       <div class="pagination">
@@ -45,6 +50,26 @@
                        @current-change="handleSearch" />
       </div>
     </el-card>
+
+    <!-- 详情弹窗 -->
+    <el-dialog v-model="detailVisible" title="操作详情" width="700px" top="5vh">
+      <el-descriptions :column="2" border>
+        <el-descriptions-item label="ID">{{ detailRow.id }}</el-descriptions-item>
+        <el-descriptions-item label="操作">{{ detailRow.action }}</el-descriptions-item>
+        <el-descriptions-item label="操作用户">{{ detailRow.username }}</el-descriptions-item>
+        <el-descriptions-item label="IP地址">{{ detailRow.ipAddress }}</el-descriptions-item>
+        <el-descriptions-item label="索引">{{ detailRow.indexName }}</el-descriptions-item>
+        <el-descriptions-item label="文档ID">{{ detailRow.docId }}</el-descriptions-item>
+        <el-descriptions-item label="时间" :span="2">{{ detailRow.createdAt }}</el-descriptions-item>
+      </el-descriptions>
+      <div v-if="detailRow.beforeContent" style="margin-top:16px">
+        <h4>操作内容</h4>
+        <pre class="json-view">{{ formatJson(detailRow.beforeContent) }}</pre>
+      </div>
+      <template #footer>
+        <el-button @click="detailVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -64,6 +89,9 @@ const loading = ref(false)
 const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
+
+const detailVisible = ref(false)
+const detailRow = ref({})
 
 async function handleSearch() {
   loading.value = true
@@ -92,9 +120,33 @@ function handleReset() {
   handleSearch()
 }
 
+function showDetail(row) {
+  detailRow.value = row
+  detailVisible.value = true
+}
+
+function formatJson(str) {
+  try {
+    return JSON.stringify(JSON.parse(str), null, 2)
+  } catch (e) {
+    return str
+  }
+}
+
 handleSearch()
 </script>
 
 <style scoped>
 .pagination { margin-top: 16px; display: flex; justify-content: flex-end; }
+.json-view {
+  background: #f5f7fa;
+  padding: 16px;
+  border-radius: 4px;
+  max-height: 40vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 13px;
+  line-height: 1.6;
+}
 </style>
