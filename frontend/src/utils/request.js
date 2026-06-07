@@ -25,7 +25,7 @@ request.interceptors.response.use(
     return data
   },
   error => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 || error.response?.status === 403) {
       localStorage.clear()
       router.push('/login')
       ElMessage.error('登录已过期，请重新登录')
