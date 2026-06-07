@@ -28,14 +28,26 @@
     </div>
 
     <div class="section">
-      <el-button @click="handleExport" icon="Download"
-                 :disabled="role === 'viewer' || !selectedIndex">导出 JSONL</el-button>
+      <el-dropdown @command="handleExport" :disabled="role === 'viewer' || !selectedIndex">
+        <el-button icon="Download" :disabled="role === 'viewer' || !selectedIndex">
+          导出 JSONL <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+        </el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="selected">勾选记录</el-dropdown-item>
+            <el-dropdown-item command="current">当前页</el-dropdown-item>
+            <el-dropdown-item command="all">全部记录</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
       <el-button @click="importDialogVisible = true" icon="Upload"
                  :disabled="role === 'viewer'">导入 Excel</el-button>
     </div>
 
     <div class="section">
-      <el-table :data="tableData" border stripe v-loading="tableLoading" style="width:100%">
+      <el-table :data="tableData" ref="tableRef" border stripe v-loading="tableLoading"
+                @selection-change="onSelectionChange" style="width:100%">
+        <el-table-column type="selection" width="50" />
         <el-table-column type="index" label="序号" width="60" />
         <el-table-column v-for="col in tableColumns" :key="col"
                          :prop="col" :label="col" :show-overflow-tooltip="true"
@@ -91,7 +103,9 @@ const fieldSearchRef = ref(null)
 const dslVisible = ref(true)
 const dslText = ref('')
 
+const tableRef = ref(null)
 const tableData = ref([])
+const selectedRows = ref([])
 const tableColumns = ref([])
 const tableLoading = ref(false)
 const page = ref(1)
@@ -205,20 +219,44 @@ async function handleDelete(row) {
   doSearch()
 }
 
-async function handleExport() {
+function onSelectionChange(rows) {
+  selectedRows.value = rows
+}
+
+async function handleExport(mode) {
   let dsl = {}
   try { dsl = JSON.parse(dslText.value) } catch (e) {}
-  dsl.size = pageSize.value
-  dsl.from = (page.value - 1) * pageSize.value
-  const res = await exportDocs(selectedIndex.value, dsl)
-  const blob = res.data
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${selectedIndex.value}_export.jsonl`
-  a.click()
-  URL.revokeObjectURL(url)
-  ElMessage.success('导出成功')
+
+  if (mode === 'selected') {
+    if (selectedRows.value.length === 0) {
+      ElMessage.warning('请先勾选要导出的记录')
+      return
+    }
+    const ids = selectedRows.value.map(r => r._id)
+    dsl = { query: { terms: { _id: ids } }, size: ids.length }
+  } else if (mode === 'current') {
+    dsl.size = pageSize.value
+    dsl.from = (page.value - 1) * pageSize.value
+  } else {
+    // all: scroll all, remove from
+    delete dsl.from
+    dsl.size = 10000
+  }
+  if (!dsl.sort) dsl.sort = []
+
+  try {
+    const res = await exportDocs(selectedIndex.value, dsl)
+    const blob = res.data
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${selectedIndex.value}_export.jsonl`
+    a.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('导出成功')
+  } catch (e) {
+    ElMessage.error(e.message || '导出失败')
+  }
 }
 </script>
 
