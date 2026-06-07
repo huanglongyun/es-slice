@@ -1,23 +1,21 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-from typing import Optional
 from services.es_client import bulk_update
 from services.export_service import export_jsonl
 from services.import_service import parse_excel_to_docs
 
 router = APIRouter(prefix="/es/indexes", tags=["transport"])
 
-class ExportRequest(BaseModel):
-    conditions: list[dict] = []
-    dsl: Optional[dict] = None
-
 @router.post("/{index}/export")
-def export_docs(index: str, req: ExportRequest):
-    """导出搜索结果为 JSONL 文件"""
-    from services.search_builder import parse_search_body
+def export_docs(index: str, body: dict):
+    """导出搜索结果为 JSONL 文件，body 为完整的 ES DSL"""
     try:
-        dsl = parse_search_body(req.dict())
+        dsl = {
+            "query": body.get("query", {"match_all": {}}),
+            "size": body.get("size", 20),
+            "from": body.get("from", 0),
+            "sort": body.get("sort", [])
+        }
         buffer = export_jsonl(index, dsl)
         filename = f"{index}_export.jsonl"
         return StreamingResponse(

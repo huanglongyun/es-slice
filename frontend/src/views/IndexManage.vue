@@ -172,20 +172,13 @@ async function doSearch(conditions) {
   if (!selectedIndex.value) return
   tableLoading.value = true
   try {
-    const conds = conditions || fieldSearchRef.value?.getConditions() || []
-    let dsl = null
-    try { dsl = JSON.parse(dslText.value) } catch (e) { /* ignore */ }
+    let body = {}
+    try { body = JSON.parse(dslText.value) } catch (e) { /* fallback */ }
     // 始终用当前分页覆盖
-    if (dsl) {
-      dsl.size = pageSize.value
-      dsl.from = (page.value - 1) * pageSize.value
-    }
-    const res = await searchDocs(selectedIndex.value, {
-      conditions: conds,
-      dsl,
-      page: page.value,
-      pageSize: pageSize.value
-    })
+    body.size = pageSize.value
+    body.from = (page.value - 1) * pageSize.value
+    if (!body.sort) body.sort = []
+    const res = await searchDocs(selectedIndex.value, body)
     tableData.value = res.data.list || []
     total.value = res.data.total || 0
   } finally {
@@ -217,11 +210,11 @@ async function handleExport() {
   if (dslText.value) {
     try { dsl = JSON.parse(dslText.value) } catch (e) {}
   }
-  const conds = fieldSearchRef.value?.getConditions() || []
-  const res = await exportDocs(selectedIndex.value, {
-    conditions: conds,
-    dsl
-  })
+  let dsl = {}
+  try { dsl = JSON.parse(dslText.value) } catch (e) {}
+  dsl.size = pageSize.value
+  dsl.from = (page.value - 1) * pageSize.value
+  const res = await exportDocs(selectedIndex.value, dsl)
   const blob = new Blob([res], { type: 'application/octet-stream' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
