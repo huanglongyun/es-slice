@@ -36,17 +36,39 @@ class ImportResult(BaseModel):
     errors: list[str] = []
 
 @router.post("/import")
-async def import_excel(file: UploadFile = File(...), indexes: str = ""):
+async def import_excel(file: UploadFile = File(...), indexes: str = "", preview: str = "false"):
     """
     上传 Excel 批量更新。indexes 为逗号分隔的索引列表。
     Excel 第一行是字段名，其中 _id 列用于匹配文档。
+    preview=true 时仅解析并返回预览数据，不写入 ES。
     """
     try:
+        contents = await file.read()
+        docs = parse_excel_to_docs(contents)
+
+        if preview.lower() == "true":
+            missing_fields = []
+            for i, doc in enumerate(docs):
+                if "_id" not in doc:
+                    missing_fields.append(i + 2)  # Excel 行号（第1行是表头）
+            return {
+                "code": 0,
+                "data": {
+                    "rows": docs,
+                    "total": len(docs),
+                    "has_id": "_id" in docs[0] if docs else False,
+                    "missing_id_rows": missing_fields,
+                }
+            }
+
         target_indexes = [i.strip() for i in indexes.split(",") if i.strip()]
         if not target_indexes:
             raise HTTPException(status_code=400, detail="至少选择一个索引")
-        contents = await file.read()
-        docs = parse_excel_to_docs(contents)
+        if not docs:
+            raise HTTPException(status_code=400, detail="Excel 中没有有效数据")
+        if not docs[0].get("_id"):
+            raise HTTPException(status_code=400, detail="Excel 第一行缺少 _id 列，无法匹配文档")
+
         total_success = 0
         all_errors = []
         for idx in target_indexes:
@@ -60,5 +82,7 @@ async def import_excel(file: UploadFile = File(...), indexes: str = ""):
                 "errors": all_errors,
             }
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
