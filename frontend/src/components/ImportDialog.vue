@@ -65,7 +65,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { importExcel } from '@/api/es'
 
@@ -117,8 +117,13 @@ async function handlePreview() {
 }
 
 async function handleImport() {
+  if (!file.value) {
+    ElMessage.warning('文件已丢失，请重新上传')
+    step.value = 1
+    return
+  }
   const formData = new FormData()
-  formData.append('file', file.value)
+  formData.append('file', file.value, file.value.name)
   formData.append('indexes', selectedIndexes.value.join(','))
   importing.value = true
   try {
@@ -126,6 +131,8 @@ async function handleImport() {
     ElMessage.success(`导入完成: 成功 ${res.data.success} 条`)
     emit('update:visible', false)
     emit('imported')
+  } catch (e) {
+    ElMessage.error(e.message || '导入失败')
   } finally {
     importing.value = false
   }
@@ -147,8 +154,4 @@ function resetAll() {
 watch(() => props.visible, (v) => {
   if (!v) resetAll()
 })
-</script>
-
-<script>
-import { watch } from 'vue'
 </script>
