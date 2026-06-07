@@ -40,10 +40,10 @@ def get_index_fields(index: str) -> list[dict]:
         fields.append({"name": name, "type": field_type})
     return fields
 
-def search_docs(index: str, dsl: dict, from_: int = 0, size: int = 20) -> dict:
-    """执行 DSL 搜索，返回 {total, hits}"""
+def search_docs(index: str, dsl: dict) -> dict:
+    """执行 DSL 搜索，body 中已含 size/from，直接透传 ES"""
     es = get_es_client()
-    result = es.search(index=index, body=dsl, from_=from_, size=size)
+    result = es.search(index=index, body=dsl)
     total = result["hits"]["total"]
     if isinstance(total, dict):
         total = total["value"]

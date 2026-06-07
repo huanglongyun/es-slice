@@ -5,15 +5,18 @@ router = APIRouter(prefix="/es/indexes", tags=["search"])
 
 @router.post("/{index}/search")
 def search(index: str, body: dict):
-    """搜索指定索引的文档，body 为完整的 ES DSL"""
+    """搜索接口
+    入参: { "query":{...}, "size":20, "from":0, "sort":[] }
+    这里 query/size/from/sort 就是 ES 原生的 DSL 语法，直接透传给 ES，不做翻译
+    """
     try:
-        query = body.get("query", {"match_all": {}})
-        size = body.get("size", 20)
-        from_ = body.get("from", 0)
-        sort = body.get("sort", [])
-
-        dsl = {"query": query, "size": size, "from": from_, "sort": sort}
-        result = search_docs(index, dsl, from_=from_, size=size)
+        dsl = {
+            "query": body.get("query", {"match_all": {}}),
+            "size": body.get("size", 20),
+            "from": body.get("from", 0),
+            "sort": body.get("sort", []),
+        }
+        result = search_docs(index, dsl)
         return {
             "code": 0,
             "data": {

@@ -10,9 +10,7 @@ def export_jsonl(index: str, dsl: dict, use_scroll: bool = True) -> io.BytesIO:
     if use_scroll:
         docs = scroll_search(index, dsl)
     else:
-        from_ = dsl.get("from", 0)
-        size = dsl.get("size", 20)
-        result = search_docs(index, dsl, from_=from_, size=size)
+        result = search_docs(index, dsl)
         docs = result["hits"]
 
     buffer = io.BytesIO()
