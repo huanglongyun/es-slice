@@ -73,17 +73,19 @@ async def import_excel(
         if not docs[0].get("_id"):
             raise HTTPException(status_code=400, detail="Excel 第一行缺少 _id 列，无法匹配文档")
 
+        import copy
+        all_results = []
         total_success = 0
-        all_errors = []
         for idx in target_indexes:
-            success = bulk_update(idx, [d.copy() for d in docs])
-            total_success += success
+            result = bulk_update(idx, [copy.deepcopy(d) for d in docs])
+            total_success += result["success"]
+            all_results.append({"index": idx, **result})
         return {
             "code": 0,
             "data": {
                 "total": len(docs) * len(target_indexes),
                 "success": total_success,
-                "errors": all_errors,
+                "results": all_results,
             }
         }
     except HTTPException:

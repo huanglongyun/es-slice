@@ -86,8 +86,8 @@ def scroll_search(index: str, dsl: dict, batch_size: int = 500) -> list[dict]:
     es.clear_scroll(scroll_id=scroll_id)
     return hits
 
-def bulk_update(index: str, docs: list[dict]) -> int:
-    """批量更新文档，按 _id 匹配。返回成功更新的数量。"""
+def bulk_update(index: str, docs: list[dict]) -> dict:
+    """批量更新文档，按 _id 匹配。返回 {success, errors, total}。"""
     from elasticsearch.helpers import bulk
     es = get_es_client()
 
@@ -100,7 +100,16 @@ def bulk_update(index: str, docs: list[dict]) -> int:
                     "_index": index,
                     "_id": doc_id,
                     "doc": doc,
+                    "doc_as_upsert": False,  # 仅更新，不创建新文档
                 }
 
-    success, errors = bulk(es, actions(), raise_on_error=False)
-    return success
+    success, errors = bulk(es, actions(), raise_on_error=False, raise_on_exception=False)
+    error_details = []
+    if errors:
+        for err in errors:
+            err_action = err.get("update", {})
+            error_details.append({
+                "id": err_action.get("_id", ""),
+                "error": str(err_action.get("error", err)),
+            })
+    return {"success": success, "errors": error_details, "total": len(docs)}
