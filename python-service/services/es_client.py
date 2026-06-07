@@ -45,10 +45,10 @@ def search_docs(index: str, dsl: dict) -> dict:
     return dict(result)
 
 def get_doc(index: str, doc_id: str) -> dict:
-    """获取单条文档"""
+    """获取单条文档，返回 ES 原生格式（和 elasticvue 一致）"""
     es = get_es_client()
     result = es.get(index=index, id=doc_id)
-    return result["_source"] | {"_id": result["_id"]}
+    return dict(result)
 
 def update_doc(index: str, doc_id: str, body: dict) -> dict:
     """更新文档，返回更新后的文档"""
