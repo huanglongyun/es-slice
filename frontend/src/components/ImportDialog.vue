@@ -117,6 +117,11 @@ async function handlePreview() {
 }
 
 async function handleImport() {
+  if (selectedIndexes.value.length === 0) {
+    ElMessage.warning('请先选择目标索引')
+    step.value = 0
+    return
+  }
   if (!file.value) {
     ElMessage.warning('文件已丢失，请重新上传')
     step.value = 1
