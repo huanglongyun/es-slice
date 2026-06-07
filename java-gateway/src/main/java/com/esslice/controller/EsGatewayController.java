@@ -1,13 +1,9 @@
 package com.esslice.controller;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.*;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
 import java.net.URI;
@@ -28,6 +24,12 @@ public class EsGatewayController {
     public ResponseEntity<?> proxy(HttpServletRequest request, @RequestBody(required = false) String body) {
         try {
             String path = request.getRequestURI();
+            // 文件上传不在此处理，由 ImportController 单独代理
+            if (path.contains("/import") && request.getContentType() != null
+                    && request.getContentType().contains("multipart")) {
+                return ResponseEntity.status(400)
+                        .body("{\"code\":400,\"message\":\"import request should not reach here\"}");
+            }
             path = path.replaceFirst("/api", "");
             path = path.replaceAll("\\.do$", "");
             String query = request.getQueryString();
@@ -44,40 +46,6 @@ public class EsGatewayController {
 
             ResponseEntity<String> response = restTemplate.exchange(
                     URI.create(targetUrl), method, entity, String.class);
-
-            return ResponseEntity.status(response.getStatusCode())
-                    .body(response.getBody());
-        } catch (Exception e) {
-            return ResponseEntity.status(500)
-                    .body("{\"code\":500,\"message\":\"" + e.getMessage() + "\"}");
-        }
-    }
-
-    /** 文件导入代理 — 处理 multipart/form-data */
-    @PostMapping("/indexes/import.do")
-    public ResponseEntity<?> proxyImport(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "indexes", defaultValue = "") String indexes,
-            @RequestParam(value = "preview", defaultValue = "false") String preview) {
-        try {
-            String targetUrl = pythonBaseUrl + "/es/indexes/import";
-
-            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-            body.add("file", new ByteArrayResource(file.getBytes()) {
-                @Override
-                public String getFilename() {
-                    return file.getOriginalFilename();
-                }
-            });
-            body.add("indexes", indexes);
-            body.add("preview", preview);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-
-            HttpEntity<MultiValueMap<String, Object>> entity = new HttpEntity<>(body, headers);
-            ResponseEntity<String> response = restTemplate.exchange(
-                    URI.create(targetUrl), HttpMethod.POST, entity, String.class);
 
             return ResponseEntity.status(response.getStatusCode())
                     .body(response.getBody());
