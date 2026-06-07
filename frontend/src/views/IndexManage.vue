@@ -1,16 +1,15 @@
 <template>
   <div class="index-manage">
     <div class="section">
-      <el-select v-model="selectedIndex" placeholder="选择索引（搜索）" style="width:300px"
-                 filterable @change="onIndexChange">
+      <el-select v-model="selectedIndex" placeholder="选择索引（搜索）" style="width:300px" filterable @change="onIndexChange">
         <el-option v-for="idx in indexes" :key="idx" :label="idx" :value="idx" />
       </el-select>
     </div>
 
     <div class="section">
       <h4>字段搜索</h4>
-      <FieldSearch ref="fieldSearchRef" :fields="indexFields"
-                   @search="handleSearch" @reset="handleReset" @change="syncDsl" />
+      <FieldSearch ref="fieldSearchRef" :fields="indexFields" @search="handleSearch" @reset="handleReset"
+        @change="syncDsl" />
     </div>
 
     <div class="section" v-if="dslVisible">
@@ -18,8 +17,7 @@
         自定义 DSL
         <el-button text size="small" @click="dslVisible = false">收起</el-button>
       </h4>
-      <el-input v-model="dslText" type="textarea" :rows="6"
-                placeholder='{"query":{"bool":{"must":[...]}}}' />
+      <el-input v-model="dslText" type="textarea" :rows="6" placeholder='{"query":{"bool":{"must":[...]}}}' />
     </div>
     <div class="section" v-else>
       <el-button text size="small" @click="dslVisible = true; syncDsl()">
@@ -30,7 +28,9 @@
     <div class="section">
       <el-dropdown @command="handleExport" :disabled="role === 'viewer' || !selectedIndex">
         <el-button icon="Download" :disabled="role === 'viewer' || !selectedIndex">
-          导出 JSONL <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+          导出 JSONL <el-icon class="el-icon--right">
+            <ArrowDown />
+          </el-icon>
         </el-button>
         <template #dropdown>
           <el-dropdown-menu>
@@ -40,45 +40,39 @@
           </el-dropdown-menu>
         </template>
       </el-dropdown>
-      <el-button @click="importDialogVisible = true" icon="Upload"
-                 :disabled="role === 'viewer'">导入 Excel</el-button>
+      <el-button @click="importDialogVisible = true" icon="Upload" :disabled="role === 'viewer'">导入 Excel</el-button>
     </div>
 
     <div class="section">
       <el-table :data="tableData" ref="tableRef" border stripe v-loading="tableLoading"
-                @selection-change="onSelectionChange" style="width:100%">
+        @selection-change="onSelectionChange" style="width:100%">
         <el-table-column type="selection" width="50" />
         <el-table-column type="index" label="序号" width="60" />
-        <el-table-column v-for="col in tableColumns" :key="col"
-                         :prop="col" :label="col" :show-overflow-tooltip="true"
-                         min-width="150" />
+        <el-table-column v-for="col in tableColumns" :key="col" :prop="col" :label="col" :show-overflow-tooltip="true"
+          min-width="150" />
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
             <el-button text type="primary" size="small" @click="showDetail(row)">详情</el-button>
             <el-button text type="warning" size="small" @click="showEdit(row)"
-                       :disabled="role === 'viewer'">编辑</el-button>
+              :disabled="role === 'viewer'">编辑</el-button>
             <el-popconfirm title="确定删除?" @confirm="handleDelete(row)">
               <template #reference>
-                <el-button text type="danger" size="small"
-                           :disabled="role === 'viewer'">删除</el-button>
+                <el-button text type="danger" size="small" :disabled="role === 'viewer'">删除</el-button>
               </template>
             </el-popconfirm>
           </template>
         </el-table-column>
       </el-table>
       <div class="pagination">
-        <el-pagination v-model:current-page="page" v-model:page-size="pageSize"
-                       :total="total" :page-sizes="[10,20,50,100]"
-                       layout="total,sizes,prev,pager,next"
-                       @current-change="onPageChange"
-                       @size-change="onPageChange" />
+        <el-pagination v-model:current-page="page" v-model:page-size="pageSize" :total="total"
+          :page-sizes="[10, 20, 50, 100]" layout="total,sizes,prev,pager,next" @current-change="onPageChange"
+          @size-change="onPageChange" />
       </div>
     </div>
 
     <DocDetailDialog ref="detailDialogRef" @edit="showEdit" />
     <DocEditDialog ref="editDialogRef" @saved="doSearch" />
-    <ImportDialog v-model:visible="importDialogVisible" :indexes="indexes"
-                  @imported="doSearch" />
+    <ImportDialog v-model:visible="importDialogVisible" :indexes="indexes" @imported="doSearch" />
   </div>
 </template>
 
@@ -136,7 +130,7 @@ function stringifyDsl(conds) {
 // 初始化默认 DSL
 dslText.value = stringifyDsl()
 
-getIndexes().then(res => { indexes.value = res.data }).catch(() => {})
+getIndexes().then(res => { indexes.value = res.data }).catch(() => { })
 
 async function onIndexChange(val) {
   if (!val) return
@@ -227,7 +221,7 @@ function onSelectionChange(rows) {
 
 async function handleExport(mode) {
   let dsl = {}
-  try { dsl = JSON.parse(dslText.value) } catch (e) {}
+  try { dsl = JSON.parse(dslText.value) } catch (e) { }
 
   if (mode === 'selected') {
     if (selectedRows.value.length === 0) {
@@ -263,7 +257,17 @@ async function handleExport(mode) {
 </script>
 
 <style scoped>
-.index-manage { max-width: 1400px; }
-.section { margin-bottom: 16px; }
-.pagination { margin-top: 16px; display: flex; justify-content: flex-end; }
+.index-manage {
+  max-width: 1400px;
+}
+
+.section {
+  margin-bottom: 16px;
+}
+
+.pagination {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
 </style>
