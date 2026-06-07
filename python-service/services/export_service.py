@@ -1,10 +1,20 @@
 import json
 import io
-from services.es_client import scroll_search
+from services.es_client import scroll_search, search_docs
 
-def export_jsonl(index: str, dsl: dict) -> io.BytesIO:
-    """执行 scroll 搜索并返回 JSONL 格式的字节流"""
-    docs = scroll_search(index, dsl)
+def export_jsonl(index: str, dsl: dict, use_scroll: bool = True) -> io.BytesIO:
+    """执行搜索并返回 JSONL 格式的字节流
+    use_scroll=True: 全量导出（scroll API）
+    use_scroll=False: 当前页导出（普通查询，保留 from）
+    """
+    if use_scroll:
+        docs = scroll_search(index, dsl)
+    else:
+        from_ = dsl.get("from", 0)
+        size = dsl.get("size", 20)
+        result = search_docs(index, dsl, from_=from_, size=size)
+        docs = result["hits"]
+
     buffer = io.BytesIO()
     buffer.write(b'\xef\xbb\xbf')  # UTF-8 BOM for Windows compatibility
     for doc in docs:

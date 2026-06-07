@@ -11,13 +11,14 @@ router = APIRouter(prefix="/es/indexes", tags=["transport"])
 def export_docs(index: str, body: dict):
     """导出搜索结果为 JSONL 文件，body 为完整的 ES DSL"""
     try:
-        dsl = {
-            "query": body.get("query", {"match_all": {}}),
-            "size": body.get("size", 20),
-            "from": body.get("from", 0),
-            "sort": body.get("sort", [])
-        }
-        buffer = export_jsonl(index, dsl)
+        query = body.get("query", {"match_all": {}})
+        size = body.get("size", 20)
+        from_ = body.get("from")
+        sort = body.get("sort", [])
+        dsl = {"query": query, "size": size, "from": from_, "sort": sort}
+        # 有 from → 当前页导出，用普通查询；无 from → 全部/勾选，用 scroll
+        use_scroll = from_ is None
+        buffer = export_jsonl(index, dsl, use_scroll=use_scroll)
         filename = f"{index}_export.jsonl"
         return StreamingResponse(
             buffer,
