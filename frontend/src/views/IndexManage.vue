@@ -75,7 +75,7 @@
       </div>
     </div>
 
-    <DocDetailDialog ref="detailDialogRef" />
+    <DocDetailDialog ref="detailDialogRef" @edit="showEdit" />
     <DocEditDialog ref="editDialogRef" @saved="doSearch" />
     <ImportDialog v-model:visible="importDialogVisible" :indexes="indexes"
                   @imported="doSearch" />
