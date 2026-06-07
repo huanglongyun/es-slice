@@ -11,7 +11,7 @@ def export_jsonl(index: str, dsl: dict, use_scroll: bool = True) -> io.BytesIO:
         docs = scroll_search(index, dsl)
     else:
         result = search_docs(index, dsl)
-        docs = result["hits"]
+        docs = [h["_source"] | {"_id": h["_id"]} for h in result["hits"]["hits"]]
 
     buffer = io.BytesIO()
     buffer.write(b'\xef\xbb\xbf')  # UTF-8 BOM for Windows compatibility

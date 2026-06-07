@@ -17,12 +17,6 @@ def search(index: str, body: dict):
             "sort": body.get("sort", []),
         }
         result = search_docs(index, dsl)
-        return {
-            "code": 0,
-            "data": {
-                "total": result["total"],
-                "list": result["hits"],
-            }
-        }
+        return {"code": 0, "data": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

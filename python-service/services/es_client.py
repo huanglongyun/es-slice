@@ -39,16 +39,10 @@ def get_index_fields(index: str) -> list[dict]:
     return fields
 
 def search_docs(index: str, dsl: dict) -> dict:
-    """执行 DSL 搜索，body 中已含 size/from，直接透传 ES"""
+    """执行 DSL 搜索，返回 ES 原生格式（和 elasticvue 一致）"""
     es = get_es_client()
     result = es.search(index=index, body=dsl)
-    total = result["hits"]["total"]
-    if isinstance(total, dict):
-        total = total["value"]
-    return {
-        "total": total,
-        "hits": [h["_source"] | {"_id": h["_id"]} for h in result["hits"]["hits"]]
-    }
+    return dict(result)
 
 def get_doc(index: str, doc_id: str) -> dict:
     """获取单条文档"""
@@ -72,8 +66,8 @@ def scroll_search(index: str, dsl: dict, batch_size: int = 500) -> list[dict]:
     es = get_es_client()
     scroll_dsl = {k: v for k, v in dsl.items() if k != "from"}
     result = es.search(index=index, body=scroll_dsl, scroll="2m", size=batch_size)
-    scroll_id = result.get("_scroll_id")
     hits = [h["_source"] | {"_id": h["_id"]} for h in result["hits"]["hits"]]
+    scroll_id = result.get("_scroll_id")
     try:
         while scroll_id:
             result = es.scroll(scroll_id=scroll_id, scroll="2m")

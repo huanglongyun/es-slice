@@ -193,8 +193,10 @@ async function doSearch(conditions) {
     body.from = (page.value - 1) * pageSize.value
     if (!body.sort) body.sort = []
     const res = await searchDocs(selectedIndex.value, body)
-    tableData.value = res.data.list || []
-    total.value = res.data.total || 0
+    const hits = res.data.hits || {}
+    tableData.value = (hits.hits || []).map(h => ({ _id: h._id, _index: h._index, _score: h._score, ...h._source }))
+    const t = hits.total || 0
+    total.value = typeof t === 'object' ? t.value : t
   } finally {
     tableLoading.value = false
   }
