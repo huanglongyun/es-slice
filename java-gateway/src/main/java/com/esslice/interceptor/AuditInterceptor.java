@@ -92,17 +92,14 @@ public class AuditInterceptor {
             } catch (Exception ignored) {}
         }
 
-        // 安全获取请求体
-        Object[] args = joinPoint.getArgs();
-        if (action.equals("UPDATE") && args.length >= 2 && args[1] instanceof String) {
-            afterContent = (String) args[1];  // 更新的字段
-        } else if (!action.equals("UPDATE") && !action.equals("DELETE")
-                && args.length >= 2 && args[1] instanceof String) {
-            String body = (String) args[1];
-            afterContent = body.length() > 500 ? body.substring(0, 500) + "..." : body;
-        }
-
         Object result = joinPoint.proceed();
+
+        // 更新后获取新文档，保证 before/after 格式一致
+        if (action.equals("UPDATE") && !indexName.isEmpty() && !docId.isEmpty()) {
+            afterContent = fetchDocFromPython(indexName, docId);
+        } else if (action.equals("IMPORT")) {
+            afterContent = beforeContent;  // 导入操作，前后都是索引列表
+        }
 
         AuditLog log = new AuditLog();
         log.setUserId(userId);

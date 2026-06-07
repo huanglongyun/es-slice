@@ -62,9 +62,21 @@
         <el-descriptions-item label="文档ID">{{ detailRow.docId }}</el-descriptions-item>
         <el-descriptions-item label="时间" :span="2">{{ detailRow.createdAt }}</el-descriptions-item>
       </el-descriptions>
-      <div v-if="detailRow.beforeContent" style="margin-top:16px">
-        <h4>操作内容</h4>
-        <pre class="json-view">{{ formatJson(detailRow.beforeContent) }}</pre>
+      <div style="margin-top:16px">
+        <el-row :gutter="16" v-if="detailRow.beforeContent">
+          <el-col :span="12">
+            <h4>修改前</h4>
+            <pre class="json-view">{{ formatJson(detailRow.beforeContent) }}</pre>
+          </el-col>
+          <el-col :span="12" v-if="detailRow.afterContent">
+            <h4>修改后</h4>
+            <pre class="json-view">{{ formatJson(detailRow.afterContent) }}</pre>
+          </el-col>
+        </el-row>
+        <div v-else-if="detailRow.beforeContent">
+          <h4>操作内容</h4>
+          <pre class="json-view">{{ formatJson(detailRow.beforeContent) }}</pre>
+        </div>
       </div>
       <template #footer>
         <el-button @click="detailVisible = false">关闭</el-button>
