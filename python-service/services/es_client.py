@@ -26,18 +26,16 @@ def get_index_list() -> list[str]:
     ]
 
 def get_index_fields(index: str) -> list[dict]:
-    """获取索引字段映射，返回字段名和类型的列表"""
+    """获取索引字段映射，返回字段名和类型的列表。
+    text 类型字段本身支持搜索，不再重复暴露 .keyword 子字段"""
     es = get_es_client()
     mapping = es.indices.get_mapping(index=index)
     properties = mapping[index]["mappings"].get("properties", {})
     fields = []
     for name, prop in properties.items():
         field_type = prop.get("type", "object")
-        if field_type == "text" and "fields" in prop:
-            sub = prop["fields"]
-            if "keyword" in sub:
-                fields.append({"name": f"{name}.keyword", "type": "keyword"})
-        fields.append({"name": name, "type": field_type})
+        if field_type != "object":
+            fields.append({"name": name, "type": field_type})
     return fields
 
 def search_docs(index: str, dsl: dict) -> dict:
@@ -72,18 +70,21 @@ def delete_doc(index: str, doc_id: str) -> None:
 def scroll_search(index: str, dsl: dict, batch_size: int = 500) -> list[dict]:
     """使用 scroll API 遍历大批量结果，用于导出"""
     es = get_es_client()
-    scroll_dsl = {k: v for k, v in dsl.items() if k != "from"}  # scroll 不支持 from
+    scroll_dsl = {k: v for k, v in dsl.items() if k != "from"}
     result = es.search(index=index, body=scroll_dsl, scroll="2m", size=batch_size)
-    scroll_id = result["_scroll_id"]
+    scroll_id = result.get("_scroll_id")
     hits = [h["_source"] | {"_id": h["_id"]} for h in result["hits"]["hits"]]
-    while True:
-        result = es.scroll(scroll_id=scroll_id, scroll="2m")
-        scroll_id = result["_scroll_id"]
-        batch = [h["_source"] | {"_id": h["_id"]} for h in result["hits"]["hits"]]
-        if not batch:
-            break
-        hits.extend(batch)
-    es.clear_scroll(scroll_id=scroll_id)
+    try:
+        while scroll_id:
+            result = es.scroll(scroll_id=scroll_id, scroll="2m")
+            scroll_id = result.get("_scroll_id")
+            batch = [h["_source"] | {"_id": h["_id"]} for h in result["hits"]["hits"]]
+            if not batch:
+                break
+            hits.extend(batch)
+    finally:
+        if scroll_id:
+            es.clear_scroll(scroll_id=scroll_id)
     return hits
 
 def bulk_update(index: str, docs: list[dict]) -> dict:
