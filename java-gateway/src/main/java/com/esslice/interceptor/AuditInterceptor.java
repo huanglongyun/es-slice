@@ -12,6 +12,8 @@ import org.springframework.http.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -98,7 +100,13 @@ public class AuditInterceptor {
         if (action.equals("UPDATE") && !indexName.isEmpty() && !docId.isEmpty()) {
             afterContent = fetchDocFromPython(indexName, docId);
         } else if (action.equals("IMPORT")) {
-            afterContent = beforeContent;  // 导入操作，前后都是索引列表
+            // 从导入响应中提取 before/after 文档
+            try {
+                ResponseEntity<?> resp = (ResponseEntity<?>) result;
+                String respBody = resp.getBody() != null ? resp.getBody().toString() : "";
+                beforeContent = extractJsonField(respBody, "before_docs");
+                afterContent = extractJsonField(respBody, "after_docs");
+            } catch (Exception ignored) {}
         }
 
         AuditLog log = new AuditLog();
@@ -126,6 +134,19 @@ public class AuditInterceptor {
         } catch (Exception e) {
             return "{\"error\": \"无法获取原文档: " + e.getMessage() + "\"}";
         }
+        return "";
+    }
+
+    /** 从 JSON 响应中提取指定字段 */
+    private String extractJsonField(String json, String fieldName) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode root = mapper.readTree(json);
+            JsonNode data = root.get("data");
+            if (data != null && data.has(fieldName)) {
+                return data.get(fieldName).toString();
+            }
+        } catch (Exception ignored) {}
         return "";
     }
 

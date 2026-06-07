@@ -74,18 +74,42 @@ async def import_excel(
             raise HTTPException(status_code=400, detail="Excel 第一行缺少 _id 列，无法匹配文档")
 
         import copy
+        # 获取修改前的文档
+        from services.es_client import get_doc, get_es_client
+        es = get_es_client()
+        before_docs = {}
+        after_docs = {}
+        doc_ids = [d.get("_id") for d in docs if d.get("_id")]
+        primary_idx = target_indexes[0]
+
+        for doc_id in doc_ids:
+            try:
+                before_docs[doc_id] = get_doc(primary_idx, doc_id)
+            except Exception:
+                before_docs[doc_id] = None
+
         all_results = []
         total_success = 0
         for idx in target_indexes:
             result = bulk_update(idx, [copy.deepcopy(d) for d in docs])
             total_success += result["success"]
             all_results.append({"index": idx, **result})
+
+        # 获取修改后的文档
+        for doc_id in doc_ids:
+            try:
+                after_docs[doc_id] = get_doc(primary_idx, doc_id)
+            except Exception:
+                after_docs[doc_id] = None
+
         return {
             "code": 0,
             "data": {
                 "total": len(docs) * len(target_indexes),
                 "success": total_success,
                 "results": all_results,
+                "before_docs": before_docs,
+                "after_docs": after_docs,
             }
         }
     except HTTPException:
