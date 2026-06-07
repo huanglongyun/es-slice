@@ -62,18 +62,18 @@ public class AuditInterceptor {
         } else if ("PUT".equals(method) && path.contains("/doc/")) {
             action = "UPDATE";
             docId = parts[parts.length - 1];
-            indexName = parts.length > 3 ? parts[3] : "";
+            indexName = parts.length > 4 ? parts[4] : "";
             // 获取更新前的文档内容
             beforeContent = fetchDocFromPython(indexName, docId);
         } else if ("DELETE".equals(method) && path.contains("/doc/")) {
             action = "DELETE";
             docId = parts[parts.length - 1];
-            indexName = parts.length > 3 ? parts[3] : "";
+            indexName = parts.length > 4 ? parts[4] : "";
             // 获取删除前的文档内容
             beforeContent = fetchDocFromPython(indexName, docId);
         } else if (path.endsWith("/export")) {
             action = "EXPORT";
-            indexName = parts.length > 3 ? parts[3] : "";
+            indexName = parts.length > 4 ? parts[4] : "";
             Object[] args = joinPoint.getArgs();
             if (args.length >= 2 && args[1] instanceof String) {
                 beforeContent = ((String) args[1]).length() > 200
