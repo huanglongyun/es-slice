@@ -138,8 +138,14 @@ function showDetail(row) {
 }
 
 function formatJson(str) {
+  if (!str) return ''
   try {
-    return JSON.stringify(JSON.parse(str), null, 2)
+    let obj = JSON.parse(str)
+    // Python 返回的是 {"code":0, "data":{...}}，只取 data 部分
+    if (obj.data && typeof obj.data === 'object') {
+      obj = obj.data
+    }
+    return JSON.stringify(obj)
   } catch (e) {
     return str
   }
