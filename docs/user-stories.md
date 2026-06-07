@@ -380,3 +380,277 @@
 一键启动：`docker compose -f docker-compose.dev.yml up -d`
 
 访问：`http://localhost:5173`
+
+---
+
+## 附录 A：Java 网关层功能设计
+
+### A.1 认证模块
+
+**JWT Token 管理（JwtTokenProvider）**
+
+| 方法 | 功能 | 说明 |
+|------|------|------|
+| `generateToken(id, username, role)` | 生成令牌 | payload 含 userId、username、role，24h 过期 |
+| `validateToken(token)` | 验证令牌 | 校验签名和过期时间 |
+| `getUsernameFromToken(token)` | 解析用户名 | 从 token 提取 subject |
+| `getRoleFromToken(token)` | 解析角色 | 用于权限判断 |
+| `getUserIdFromToken(token)` | 解析用户 ID | 用于审计日志关联 |
+
+**请求拦截（JwtAuthFilter）**
+- 每个请求到达时从 Header 取 `Authorization: Bearer <token>`
+- 验证 token 有效性，解析出用户名和角色
+- 注入 Spring Security 上下文，后续 Controller 和 Interceptor 均可获取当前用户
+
+**安全配置（SecurityConfig）**
+- 登录接口 `/api/auth/login.do` 无需认证
+- `/api/es/**` 需要 admin/editor/viewer 任一角色
+- `/api/users/**` 和 `/api/audit-logs/**` 仅 admin
+- 禁用 CSRF、启用 CORS、无状态 Session
+
+### A.2 代理转发模块
+
+**通用 JSON 代理（EsGatewayController）**
+- 路径匹配 `/api/es/**`，接收 GET/POST/PUT/DELETE
+- 处理逻辑：
+  1. 从 request 取 URI 路径
+  2. 去掉 `/api` 前缀（Python 路由不带）
+  3. 去掉 `.do` 后缀
+  4. 拼接到 `python-service:8081` 后面
+  5. 用 RestTemplate 转发，原样返回 Python 的响应
+- 不做业务处理，纯传话筒
+
+**文件导入代理（ImportController）**
+- 独立 Controller，单独匹配 `/api/es/indexes/import.do`
+- 分离原因：导入是 multipart/form-data 文件上传，不能用 `@RequestBody String`
+- 接收参数：`@RequestParam MultipartFile file`、`@RequestParam String indexes`、`@RequestParam String preview`
+- 用 `ByteArrayResource` 包装文件，以 `MultiValueMap` 形式转发给 Python
+- 配置 `spring.servlet.multipart.max-file-size=50MB`
+
+### A.3 审计拦截模块（AuditInterceptor）
+
+**拦截规则**
+- AOP 切面 `@Around`，拦截 `EsGatewayController.proxy()` 和 `ImportController.proxyImport()`
+- 只拦截 PUT/POST/DELETE 请求，GET 不审计
+
+**操作类型识别**
+
+| 请求特征 | 操作类型 |
+|---------|---------|
+| PUT + 路径含 `/doc/` | UPDATE |
+| DELETE + 路径含 `/doc/` | DELETE |
+| 路径以 `/export` 结尾 | EXPORT |
+| 路径以 `/import` 结尾 | IMPORT |
+| 其他 POST | CREATE |
+
+**修改前后文档获取**
+
+| 操作 | beforeContent | afterContent |
+|------|-------------|-------------|
+| UPDATE | 操作前 GET Python 取旧文档 | 操作后 GET Python 取新文档 |
+| DELETE | 操作前 GET Python 取旧文档 | 空 |
+| IMPORT | 从响应体解析 before_docs | 从响应体解析 after_docs |
+| EXPORT | 导出请求的 DSL（截断 200 字符） | 空 |
+
+**路径解析**
+- URL 格式：`/api/es/indexes/{索引名}/doc/{文档ID}`
+- 去掉 `.do` 后缀后按 `/` 分割
+- `parts[4]` = 索引名，`parts[6]` = 文档 ID
+
+### A.4 数据初始化模块（DataInitializer）
+
+- Spring Boot 启动时自动执行 `CommandLineRunner`
+- 检查 MySQL 中是否存在 admin 用户
+- 不存在则创建：用户名 admin、密码 admin123（BCrypt 加密）、角色 admin
+
+### A.5 用户服务（UserService）
+
+- `findByUsername()` — 按用户名查找，登录用
+- `create()` — 创建用户，密码自动 BCrypt 加密
+- `update()` — 更新用户信息，密码为空时不修改
+- `delete()` — 删除用户
+- `verifyPassword()` — 用 BCrypt 比对明文和密文
+
+### A.6 数据模型
+
+**sys_user 表**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | BIGINT PK | 自增主键 |
+| username | VARCHAR(50) UNIQUE | 登录名 |
+| password | VARCHAR(255) | BCrypt 密文 |
+| real_name | VARCHAR(50) | 真实姓名 |
+| email | VARCHAR(100) | 邮箱 |
+| role | VARCHAR(20) | admin / editor / viewer |
+| status | TINYINT | 1=启用 0=禁用 |
+| created_at | DATETIME | 创建时间 |
+| updated_at | DATETIME | 更新时间 |
+
+**audit_log 表**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | BIGINT PK | 自增主键 |
+| user_id | BIGINT | 操作人 ID |
+| username | VARCHAR(50) | 操作人用户名（冗余） |
+| action | VARCHAR(50) | UPDATE / DELETE / EXPORT / IMPORT |
+| index_name | VARCHAR(100) | 操作的 ES 索引 |
+| doc_id | VARCHAR(100) | 操作的文档 _id |
+| before_content | TEXT | 修改前的完整文档 JSON |
+| after_content | TEXT | 修改后的完整文档 JSON |
+| ip_address | VARCHAR(50) | 操作 IP |
+| created_at | DATETIME | 操作时间 |
+
+---
+
+## 附录 B：Python 服务层功能设计
+
+### B.1 ES 连接管理（es_client.py）
+
+**核心设计：单例模式**
+- `get_es_client()` 全局持有一个 Elasticsearch 实例
+- 首次调用时创建连接，后续复用
+- 支持 HTTP Basic Auth（通过环境变量配置用户名密码）
+
+**函数清单**
+
+| 函数 | 入参 | 出参 | 说明 |
+|------|------|------|------|
+| `get_index_list()` | 无 | `["idx1","idx2"]` | 取所有索引名，过滤 `.` 开头的系统索引 |
+| `get_index_fields(idx)` | 索引名 | `[{name,type}]` | 从 mapping 提取字段名和类型，排除 object 嵌套 |
+| `search_docs(idx, dsl)` | 索引名 + DSL | ES 原生响应 | body 中已含 size/from，直接透传 |
+| `get_doc(idx, id)` | 索引名 + _id | ES 原生格式 | 返回 `{_index,_id,_version,_source}` |
+| `update_doc(idx, id, body)` | 索引名 + _id + 字段 | 更新后完整文档 | `{"doc": body}` 只更新传入字段，再 get 返回 |
+| `delete_doc(idx, id)` | 索引名 + _id | 无 | 直接删除 |
+| `scroll_search(idx, dsl)` | 索引名 + DSL | `[{...docs}]` | 去掉 from，2 分钟 scroll 超时，try/finally 清理 |
+| `bulk_update(idx, docs)` | 索引名 + 文档列表 | `{success,errors,total}` | 按 _id bulk update，doc_as_upsert=false，不新增 |
+
+**scroll_search 与 search_docs 的区别**
+
+| 特性 | search_docs | scroll_search |
+|------|------------|--------------|
+| 用途 | 搜索 + 当前页导出 | 全量导出 |
+| from 参数 | 支持 | 不支持（自动去掉） |
+| 遍历方式 | 单次查询 | 分批 scroll |
+| 上下文清理 | 不需要 | try/finally clear_scroll |
+
+### B.2 搜索接口（api/search.py）
+
+```
+POST /es/indexes/{index}/search
+入参: {"query":{...}, "size":20, "from":0, "sort":[]}
+处理: 取出 query/size/from/sort → 拼成 DSL → search_docs → 透传 ES
+出参: {"code":0, "data":{ES 原生响应}}
+```
+
+- 不翻译、不转换、不做映射——前端 DSL 就是 ES 语法
+- 响应格式与 elasticvue 一致
+
+### B.3 索引接口（api/indexes.py）
+
+```
+GET /es/indexes          → get_index_list()   → ["news_articles","product_docs","user_feedback"]
+GET /es/indexes/{}/fields → get_index_fields() → [{name:"title",type:"text"},{name:"rating",type:"integer"}]
+```
+
+### B.4 文档接口（api/documents.py）
+
+```
+GET    /es/indexes/{}/doc/{} → get_doc()    → {_index, _id, _version, _source}
+PUT    /es/indexes/{}/doc/{} → update_doc() → 更新后完整文档
+DELETE /es/indexes/{}/doc/{} → delete_doc() → {code:0, message:"ok"}
+```
+
+### B.5 导出接口（api/transport.py）
+
+```
+POST /es/indexes/{index}/export
+入参: {"query":{...}, "size":20, "from":0, "sort":[]}
+```
+
+**导出模式判断逻辑：**
+
+| 条件 | 模式 | 使用函数 | 说明 |
+|------|------|---------|------|
+| body 中没有 `from` 字段 | 全量导出 | scroll_search | 去掉 from，scroll 遍历所有数据 |
+| body 中有 `from` 字段 | 当前页导出 | search_docs | 保留 from/size，只取当前页 |
+| body 为 `{terms:{_id:[...]}}` | 勾选导出 | scroll_search | terms 查询精确匹配，无 from |
+
+**响应：** StreamingResponse，content-type 为 `text/plain; charset=utf-8`
+**文件内容：** UTF-8 BOM + 每行一个 JSON（JSONL 格式）
+
+### B.6 导入接口（api/transport.py）
+
+```
+POST /es/indexes/import
+Content-Type: multipart/form-data
+入参:
+  file=<Excel文件>
+  indexes="user_feedback,news_articles"
+  preview="true" | "false"
+```
+
+**preview=true（预览模式）：**
+- 解析 Excel → 返回前 10 行数据
+- 检查 _id 列是否存在，列出缺失的行
+- 不写入 ES
+
+**preview=false（导入模式）：**
+1. 解析 Excel 得到文档列表
+2. 校验：indexes 不为空、有数据、有 _id 列
+3. 取 before_docs：遍历每个 _id 调 get_doc 取旧文档
+4. 对每个目标索引执行 bulk_update（deepcopy 避免引用污染）
+5. 取 after_docs：再次遍历取新文档
+6. 返回 `{success, total, results, before_docs, after_docs}`
+
+### B.7 Excel 解析（import_service.py）
+
+```
+Excel 文件
+  ↓ openpyxl.load_workbook
+  ↓ sheet.iter_rows(values_only=True)
+  ↓ 第 1 行 → headers（字段名列表）
+  ↓ 第 2 行起 → 每行拼成 {header: value} 字典
+  ↓ 跳过全空行
+返回 [{_id, field1, field2, ...}]
+```
+
+### B.8 接口路由汇总
+
+| 路径 | 文件 | 函数 |
+|------|------|------|
+| `GET /es/indexes` | api/indexes.py | list_indexes |
+| `GET /es/indexes/{}/fields` | api/indexes.py | get_fields |
+| `POST /es/indexes/{}/search` | api/search.py | search |
+| `GET /es/indexes/{}/doc/{}` | api/documents.py | get_document |
+| `PUT /es/indexes/{}/doc/{}` | api/documents.py | update_document |
+| `DELETE /es/indexes/{}/doc/{}` | api/documents.py | delete_document |
+| `POST /es/indexes/{}/export` | api/transport.py | export_docs |
+| `POST /es/indexes/import` | api/transport.py | import_excel |
+| `GET /health` | main.py | health |
+
+### B.9 项目文件结构
+
+```
+python-service/
+├── main.py              # FastAPI 入口，注册路由，uvicorn 启动
+├── config.py            # ES 地址、服务端口（支持环境变量）
+├── requirements.txt     # 依赖清单
+├── seed_data.py         # 造测试数据工具
+├── Dockerfile           # Docker 镜像
+├── api/
+│   ├── indexes.py       # 索引列表 + 字段查询
+│   ├── search.py        # DSL 搜索
+│   ├── documents.py     # 单条文档 CRUD
+│   └── transport.py     # 导出 JSONL + 导入 Excel
+├── services/
+│   ├── es_client.py     # ES 连接管理（核心）
+│   ├── export_service.py # 导出为 JSONL 字节流
+│   └── import_service.py # Excel 解析
+├── utils/
+│   └── field_utils.py   # 字段类型判断
+└── tests/
+    ├── test_search.py   # 搜索接口测试
+    ├── test_export.py   # 导出功能测试
+    └── test_import.py   # Excel 解析测试
