@@ -211,7 +211,7 @@ async function handleExport() {
   dsl.size = pageSize.value
   dsl.from = (page.value - 1) * pageSize.value
   const res = await exportDocs(selectedIndex.value, dsl)
-  const blob = new Blob([res], { type: 'application/octet-stream' })
+  const blob = res.data
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
