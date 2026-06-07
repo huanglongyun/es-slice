@@ -25,7 +25,20 @@ export function deleteDoc(index, docId) {
 }
 
 export function exportDocs(index, params) {
-  return request.post(`/es/indexes/${encodeURIComponent(index)}/export.do`, params, { responseType: 'blob' })
+  const token = localStorage.getItem('token')
+  return request.post(`/es/indexes/${encodeURIComponent(index)}/export.do`, params, {
+    responseType: 'blob',
+    headers: token ? { Authorization: `Bearer ${token}` } : {}
+  }).then(res => res).catch(e => {
+    // blob 错误响应需要特殊处理
+    if (e.response?.data instanceof Blob) {
+      return e.response.data.text().then(t => {
+        try { const err = JSON.parse(t); throw new Error(err.message || '导出失败') }
+        catch (_) { throw new Error('导出失败') }
+      })
+    }
+    throw e
+  })
 }
 
 export function importExcel(formData) {
