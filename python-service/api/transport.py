@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from services.es_client import bulk_update
@@ -36,7 +36,11 @@ class ImportResult(BaseModel):
     errors: list[str] = []
 
 @router.post("/import")
-async def import_excel(file: UploadFile = File(...), indexes: str = "", preview: str = "false"):
+async def import_excel(
+    file: UploadFile = File(...),
+    indexes: str = Form(default=""),
+    preview: str = Form(default="false")
+):
     """
     上传 Excel 批量更新。indexes 为逗号分隔的索引列表。
     Excel 第一行是字段名，其中 _id 列用于匹配文档。
