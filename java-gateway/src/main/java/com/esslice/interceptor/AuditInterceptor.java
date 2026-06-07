@@ -7,9 +7,12 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -24,6 +27,11 @@ public class AuditInterceptor {
 
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
+
+    @Value("${app.python.base-url}")
+    private String pythonBaseUrl;
+
+    private final RestTemplate restTemplate = new RestTemplate();
 
     @Around("execution(* com.esslice.controller.EsGatewayController.proxy(..)) || execution(* com.esslice.controller.ImportController.proxyImport(..))")
     public Object audit(ProceedingJoinPoint joinPoint) throws Throwable {
@@ -41,25 +49,36 @@ public class AuditInterceptor {
         String indexName = "";
         String action = "CREATE";
         String docId = "";
+        String beforeContent = "";
+        String afterContent = "";
 
         if (path.endsWith("/import")) {
             action = "IMPORT";
-            // 从 args 中获取 indexes 参数（ImportController.args[1] 是 indexes 字符串）
             Object[] args = joinPoint.getArgs();
             if (args.length >= 2 && args[1] instanceof String) {
                 indexName = (String) args[1];
+                beforeContent = indexName;
             }
         } else if ("PUT".equals(method) && path.contains("/doc/")) {
             action = "UPDATE";
             docId = parts[parts.length - 1];
             indexName = parts.length > 3 ? parts[3] : "";
+            // 获取更新前的文档内容
+            beforeContent = fetchDocFromPython(indexName, docId);
         } else if ("DELETE".equals(method) && path.contains("/doc/")) {
             action = "DELETE";
             docId = parts[parts.length - 1];
             indexName = parts.length > 3 ? parts[3] : "";
+            // 获取删除前的文档内容
+            beforeContent = fetchDocFromPython(indexName, docId);
         } else if (path.endsWith("/export")) {
             action = "EXPORT";
             indexName = parts.length > 3 ? parts[3] : "";
+            Object[] args = joinPoint.getArgs();
+            if (args.length >= 2 && args[1] instanceof String) {
+                beforeContent = ((String) args[1]).length() > 200
+                        ? ((String) args[1]).substring(0, 200) + "..." : (String) args[1];
+            }
         }
 
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -73,11 +92,14 @@ public class AuditInterceptor {
             } catch (Exception ignored) {}
         }
 
-        // 安全获取请求体内容
-        String requestBody = "";
+        // 安全获取请求体
         Object[] args = joinPoint.getArgs();
-        if (args.length >= 2 && args[1] instanceof String) {
-            requestBody = (String) args[1];
+        if (action.equals("UPDATE") && args.length >= 2 && args[1] instanceof String) {
+            afterContent = (String) args[1];  // 更新的字段
+        } else if (!action.equals("UPDATE") && !action.equals("DELETE")
+                && args.length >= 2 && args[1] instanceof String) {
+            String body = (String) args[1];
+            afterContent = body.length() > 500 ? body.substring(0, 500) + "..." : body;
         }
 
         Object result = joinPoint.proceed();
@@ -88,11 +110,26 @@ public class AuditInterceptor {
         log.setAction(action);
         log.setIndexName(indexName);
         log.setDocId(docId);
-        log.setBeforeContent(requestBody);
+        log.setBeforeContent(beforeContent);
+        log.setAfterContent(afterContent);
         log.setIpAddress(getClientIp(request));
         auditLogRepository.save(log);
 
         return result;
+    }
+
+    /** 从 Python 服务获取当前文档内容（更新/删除前） */
+    private String fetchDocFromPython(String indexName, String docId) {
+        try {
+            String url = pythonBaseUrl + "/es/indexes/" + indexName + "/doc/" + docId;
+            ResponseEntity<String> resp = restTemplate.getForEntity(url, String.class);
+            if (resp.getStatusCode().is2xxSuccessful() && resp.getBody() != null) {
+                return resp.getBody();
+            }
+        } catch (Exception e) {
+            return "{\"error\": \"无法获取原文档: " + e.getMessage() + "\"}";
+        }
+        return "";
     }
 
     private String getClientIp(HttpServletRequest request) {
