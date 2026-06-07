@@ -206,10 +206,6 @@ async function handleDelete(row) {
 }
 
 async function handleExport() {
-  let dsl = null
-  if (dslText.value) {
-    try { dsl = JSON.parse(dslText.value) } catch (e) {}
-  }
   let dsl = {}
   try { dsl = JSON.parse(dslText.value) } catch (e) {}
   dsl.size = pageSize.value
